@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Moodify</title>
+<link rel="stylesheet" href="/static/style.css"></head><body>
+<header><h1>Moodi<span>fy</span></h1><p>Music that matches how you feel</p></header>
+<main>
+<div class="kbox"><label for="k">Number of tracks</label><input type="number" id="k" min="1" max="{{ max_k }}" value="{{ k }}"><span>(1 to {{ max_k }})</span></div>
+<form method="get" class="box"><input type="hidden" name="k" value="{{ k }}"><label>How are you feeling today?</label>
+<div class="row"><input name="text" value="{{ text }}" placeholder="e.g. I feel tired and want to relax"><button>Detect &amp; Recommend</button></div>
+{% if msg %}<p class="msg">{{ msg }}</p>{% endif %}</form>
+<form method="get" class="box journey"><input type="hidden" name="k" value="{{ k }}"><label>Mood Journey: build a playlist that takes you from one mood to another</label>
+<div class="row"><span>I feel</span><select name="start">{% for m in moods %}<option value="{{ m }}" {{ 'selected' if (m==start) or (not start and m=='sad') }}>{{ emoji[m] }} {{ m|capitalize }}</option>{% endfor %}</select>
+<span>and want to feel</span><select name="goal">{% for m in moods %}<option value="{{ m }}" {{ 'selected' if (m==goal) or (not goal and m=='happy') }}>{{ emoji[m] }} {{ m|capitalize }}</option>{% endfor %}</select><button>Create journey</button></div></form>
+<div class="moods">{% for m in moods %}<a class="chip {{ 'on' if m==mood }}" href="/?mood={{ m }}&k={{ k }}">{{ emoji[m] }} {{ m|capitalize }}</a>{% endfor %}</div>
+{% if tracks %}<h2>{% if trip %}Your journey: {{ start }} → {{ goal }}{% else %}Recommended for a {{ mood }} mood{% endif %} ({{ tracks|length }} tracks)</h2>
+<table><tr><th>#</th><th>Title</th><th>Artist</th>{% if trip %}<th>Mood blend</th>{% else %}<th>Genre</th>{% endif %}<th>Match</th><th></th></tr>
+{% for t in tracks %}<tr><td>{{ loop.index }}</td><td>{{ t.title }}<div class="why">{{ t.why }}</div></td><td>{{ t.artist }}</td>
+{% if trip %}<td>{{ ((1-t.blend)*100)|round|int }}% {{ start }}<br>{{ (t.blend*100)|round|int }}% {{ goal }}</td>{% else %}<td>{{ t.genre }}</td>{% endif %}
+<td><div class="bar"><i style="width:{{ (t.score*100)|round|int }}%"></i></div>{{ (t.score*100)|round|int }}%</td>
+<td><a class="play" href="{{ t.url }}" target="_blank">▶ Spotify</a></td></tr>{% endfor %}</table>{% endif %}
+</main>
+<script>
+// keep the "Number of tracks" box in sync with the forms and mood chips
+var kBox = document.getElementById("k");
+function currentK() { var v = parseInt(kBox.value, 10); return isNaN(v) ? {{ k }} : Math.max(1, Math.min({{ max_k }}, v)); }
+document.querySelectorAll("form").forEach(function (f) { f.addEventListener("submit", function () { f.querySelector('input[name="k"]').value = currentK(); }); });
+document.querySelectorAll("a.chip").forEach(function (a) { a.addEventListener("click", function (e) { e.preventDefault(); location.href = "/?mood=" + a.textContent.trim().split(" ").pop().toLowerCase() + "&k=" + currentK(); }); });
+kBox.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); location.search = location.search.replace(/([?&])k=\d*&?/, "$1") + (location.search ? "&" : "?") + "k=" + currentK(); } });
+</script>
+</body></html>
