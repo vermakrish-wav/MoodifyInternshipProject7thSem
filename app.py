@@ -1,14 +1,17 @@
+import os
 from urllib.parse import quote
 import pandas as pd
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from recommender import MOODS, recommend, journey, detect_mood
 
+BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
-DF = pd.read_csv("data/csvmoodfiy.csv")
+DF = pd.read_csv(os.path.join(BASE, "data", "tracks.csv"))
 EMOJI = {"happy": "😊", "sad": "😢", "calm": "😌", "energetic": "⚡", "angry": "😠", "romantic":"💕","focused":"🎯","nostalgic":"☹️","heartbroken":"💔","confident":"😁", "anxious":"🫪","dreamy":"💭"}
 
 
 DEFAULT_K, MAX_K = 10, 500
+MAX_JOURNEY_K = 100
 
 
 def get_k(value):
@@ -27,6 +30,12 @@ def spotify_url(r):
     return "https://open.spotify.com/search/" + quote(f"{r['title']} {r['artist']}")
 
 
+@app.route("/style.css")
+def style():
+    # on Vercel the CDN serves public/style.css directly; this route makes it work locally too
+    return send_from_directory(os.path.join(BASE, "public"), "style.css")
+
+
 @app.route("/")
 def index():
     mood = request.args.get("mood", "")
@@ -35,7 +44,7 @@ def index():
     start, goal = request.args.get("start", ""), request.args.get("goal", "")
     msg, tracks, trip = "", [], False
     if start in MOODS and goal in MOODS:
-        res = journey(DF, start, goal, k=k)
+        res = journey(DF, start, goal, k=min(k, MAX_JOURNEY_K))
         tracks = [dict(r, url=spotify_url(r)) for r in res.to_dict("records")]
         trip = True
     elif text and not mood:
@@ -60,7 +69,7 @@ def api(mood):
 def api_journey(start, goal):
     if start not in MOODS or goal not in MOODS:
         return jsonify(error="unknown mood"), 404
-    return jsonify(journey(DF, start, goal, k=get_k(request.args.get("k"))).to_dict("records"))
+    return jsonify(journey(DF, start, goal, k=min(get_k(request.args.get("k")), MAX_JOURNEY_K)).to_dict("records"))
 
 
 if __name__ == "__main__":
